@@ -3,6 +3,7 @@ const router = express.Router();
 const { getLoginUrl, setSessionTokens, activeKiteSession } = require('../services/kiteService');
 const { KiteConnect } = require('kiteconnect');
 const KiteSession = require('../models/KiteSession');
+const User = require('../models/User');
 
 // Get Login URL
 router.get('/login-url', (req, res) => {
@@ -49,18 +50,40 @@ router.get('/callback', async (req, res) => {
         user_type: response.user_type
       });
 
-      // Save to MongoDB if connected
+      // Save/Upsert User & Session in MongoDB Atlas
       try {
-        await KiteSession.create({
-          apiKey,
-          apiSecret,
-          accessToken: response.access_token,
-          publicToken: response.public_token,
-          userId: response.user_id,
-          userName: response.user_name,
-          userEmail: response.email,
-          userType: response.user_type
-        });
+        await User.findOneAndUpdate(
+          { userId: response.user_id },
+          {
+            userId: response.user_id,
+            userName: response.user_name,
+            userEmail: response.email,
+            userType: response.user_type,
+            avatarUrl: response.avatar_url || '',
+            exchanges: response.exchanges || [],
+            products: response.products || [],
+            orderTypes: response.order_types || [],
+            lastLoginAt: new Date()
+          },
+          { upsert: true, new: true }
+        );
+
+        await KiteSession.findOneAndUpdate(
+          { userId: response.user_id },
+          {
+            apiKey,
+            apiSecret,
+            accessToken: response.access_token,
+            publicToken: response.public_token,
+            userId: response.user_id,
+            userName: response.user_name,
+            userEmail: response.email,
+            userType: response.user_type,
+            loginTime: new Date()
+          },
+          { upsert: true, new: true }
+        );
+        console.log(`✅ MongoDB Atlas DB Session & User updated for: ${response.user_name} (${response.user_id})`);
       } catch (dbErr) {
         console.warn('DB session save warning:', dbErr.message);
       }
@@ -94,7 +117,14 @@ router.get('/status', (req, res) => {
 });
 
 // Logout
-router.post('/logout', (req, res) => {
+router.post('/logout', async (req, res) => {
+  try {
+    if (activeKiteSession.user?.user_id) {
+      await KiteSession.deleteOne({ userId: activeKiteSession.user.user_id });
+    }
+  } catch (err) {
+    console.warn('DB logout note:', err.message);
+  }
   activeKiteSession.accessToken = null;
   res.json({ success: true, message: 'Logged out successfully' });
 });

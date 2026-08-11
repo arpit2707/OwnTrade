@@ -1,4 +1,5 @@
 const { KiteConnect } = require('kiteconnect');
+const KiteSession = require('../models/KiteSession');
 
 let activeKiteSession = {
   apiKey: process.env.KITE_API_KEY || 'demo_key',
@@ -12,8 +13,6 @@ let activeKiteSession = {
   }
 };
 
-let kiteInstance = null;
-
 function getKiteInstance() {
   if (!activeKiteSession.apiKey) return null;
   const kc = new KiteConnect({
@@ -23,6 +22,27 @@ function getKiteInstance() {
     kc.setAccessToken(activeKiteSession.accessToken);
   }
   return kc;
+}
+
+// Restore session from MongoDB Atlas on server startup
+async function loadSessionFromDB() {
+  try {
+    const latestSession = await KiteSession.findOne().sort({ updatedAt: -1 });
+    if (latestSession && latestSession.accessToken) {
+      activeKiteSession.apiKey = latestSession.apiKey || activeKiteSession.apiKey;
+      activeKiteSession.apiSecret = latestSession.apiSecret || activeKiteSession.apiSecret;
+      activeKiteSession.accessToken = latestSession.accessToken;
+      activeKiteSession.user = {
+        user_id: latestSession.userId,
+        user_name: latestSession.userName,
+        email: latestSession.userEmail,
+        user_type: latestSession.userType
+      };
+      console.log(`✅ Restored active Zerodha session for User: ${latestSession.userName} (${latestSession.userId}) from MongoDB Atlas DB`);
+    }
+  } catch (err) {
+    console.warn('⚠️ Session restore from DB note:', err.message);
+  }
 }
 
 // Generate Login URL
@@ -41,22 +61,13 @@ function setSessionTokens(apiKey, apiSecret, accessToken, userDetails) {
   }
 }
 
-// Mock Data Providers for Demo Mode
+// Mock Fallback Data Providers
 const mockMargins = {
   equity: {
     enabled: true,
     net: 245800.50,
-    available: {
-      cash: 180000.00,
-      collateral: 65800.50,
-      intraday_payin: 0
-    },
-    utilised: {
-      debits: 12400.00,
-      exposure: 5400.00,
-      m2m_realised: 1500.00,
-      m2m_unrealised: 2300.00
-    }
+    available: { cash: 180000.00, collateral: 65800.50, intraday_payin: 0 },
+    utilised: { debits: 12400.00, exposure: 5400.00, m2m_realised: 1500.00, m2m_unrealised: 2300.00 }
   },
   commodity: {
     enabled: true,
@@ -96,21 +107,6 @@ const mockOrders = [
     status: 'OPEN',
     status_message: null,
     order_timestamp: '2026-08-11 10:12:00'
-  },
-  {
-    order_id: '240811003',
-    parent_order_id: null,
-    exchange: 'NSE',
-    tradingsymbol: 'TATASTEEL',
-    transaction_type: 'SELL',
-    order_type: 'MARKET',
-    product: 'MIS',
-    quantity: 200,
-    price: 165.40,
-    trigger_price: 0,
-    status: 'COMPLETE',
-    status_message: null,
-    order_timestamp: '2026-08-11 10:30:45'
   }
 ];
 
@@ -140,19 +136,6 @@ const mockHoldings = [
     pnl: 2610.00,
     day_change: 15.25,
     day_change_percentage: 0.91
-  },
-  {
-    tradingsymbol: 'TATAMOTORS',
-    exchange: 'NSE',
-    isin: 'INE155A01022',
-    quantity: 100,
-    authorised_quantity: 100,
-    average_price: 1050.00,
-    last_price: 1015.00,
-    close_price: 1030.00,
-    pnl: -3500.00,
-    day_change: -15.00,
-    day_change_percentage: -1.46
   }
 ];
 
@@ -193,19 +176,8 @@ const mockGTTs = [
     type: 'single',
     tradingsymbol: 'NIFTY 50',
     exchange: 'NSE',
-    condition: {
-      trigger_values: [24200],
-      last_price: 24350.50
-    },
-    orders: [
-      {
-        transaction_type: 'BUY',
-        quantity: 50,
-        product: 'CNC',
-        order_type: 'LIMIT',
-        price: 24200
-      }
-    ],
+    condition: { trigger_values: [24200], last_price: 24350.50 },
+    orders: [{ transaction_type: 'BUY', quantity: 50, product: 'CNC', order_type: 'LIMIT', price: 24200 }],
     status: 'active',
     created_at: '2026-08-01 11:20:00'
   }
@@ -216,6 +188,7 @@ module.exports = {
   getLoginUrl,
   setSessionTokens,
   getKiteInstance,
+  loadSessionFromDB,
   mockMargins,
   mockOrders,
   mockHoldings,

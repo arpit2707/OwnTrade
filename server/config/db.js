@@ -11,9 +11,12 @@ const connectDB = async () => {
 
     const conn = await mongoose.connect(connStr);
     console.log(`✅ MongoDB Atlas Connected: ${conn.connection.host}`);
+
+    // Restore active session from DB on connection
+    const { loadSessionFromDB } = require('../services/kiteService');
+    await loadSessionFromDB();
   } catch (error) {
     console.error(`❌ MongoDB Connection Error: ${error.message}`);
-    // Don't crash process so API endpoints remain responsive
   }
 };
 
