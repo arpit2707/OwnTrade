@@ -28,7 +28,7 @@ router.post('/config', async (req, res) => {
 // OAuth Callback from Zerodha (Exchanges request_token for access_token)
 router.get('/callback', async (req, res) => {
   const { request_token, status } = req.query;
-  const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+  const clientUrl = process.env.CLIENT_URL || 'https://owntrade.netlify.app';
 
   if (status === 'error' || !request_token) {
     return res.redirect(`${clientUrl}?auth_status=failed`);
