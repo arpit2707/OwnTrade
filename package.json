@@ -1,0 +1,12 @@
+{
+  "name": "zerodha-algo-trading",
+  "version": "1.0.0",
+  "description": "Zerodha API based Algo Trading Setup",
+  "main": "zerodha_trading.js",
+  "scripts": {
+    "start": "node zerodha_trading.js"
+  },
+  "dependencies": {
+    "kiteconnect": "^5.0.0"
+  }
+}
