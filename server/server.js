@@ -1,7 +1,9 @@
 require('dotenv').config();
 const express = require('express');
+const http = require('http');
 const cors = require('cors');
 const connectDB = require('./config/db');
+const { initSocket } = require('./services/socketService');
 
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
@@ -13,6 +15,7 @@ const journalRoutes = require('./routes/journalRoutes');
 const postbackRoutes = require('./routes/postbackRoutes');
 
 const app = express();
+const server = http.createServer(app);
 const PORT = process.env.PORT || 5000;
 
 // Middleware
@@ -22,6 +25,9 @@ app.use(express.urlencoded({ extended: true }));
 
 // Connect to MongoDB Atlas
 connectDB();
+
+// Initialize Socket.IO Server
+const io = initSocket(server);
 
 // API Routes
 app.use('/api/kite/auth', authRoutes);
@@ -38,11 +44,13 @@ app.get('/api/health', (req, res) => {
   res.json({
     status: 'online',
     app: 'OwnTrade Kite Connect v3 Backend API',
+    socket: 'active',
     timestamp: new Date()
   });
 });
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`🚀 OwnTrade Backend running on port ${PORT}`);
+  console.log(`⚡ Socket.IO Real-time server active`);
   console.log(`📡 Kite Connect OAuth Callback endpoint: http://localhost:${PORT}/api/kite/auth/callback`);
 });
